@@ -35,7 +35,7 @@ export async function POST(request: NextRequest) {
 
   try {
     const message = await client.messages.create({
-      model: "claude-3-5-haiku-20241022",
+      model: "claude-haiku-4-5-20251001",
       max_tokens: 300,
       system: `You are a professional business reputation manager. Write a response to this customer review on behalf of ${businessName}, a ${businessType}. Tone should be ${tone}. Response should be 2-4 sentences, genuine, not templated-sounding, and encourage the customer to return. Never make up specific details. Sign off with the business name.`,
       messages: [
