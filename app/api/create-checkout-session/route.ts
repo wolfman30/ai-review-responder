@@ -11,13 +11,21 @@ export async function POST(request: NextRequest) {
   }
 
   const stripe = new Stripe(secretKey);
-
   const origin = request.headers.get("origin") || "http://localhost:3000";
+
+  let email: string | undefined;
+  try {
+    const body = await request.json();
+    email = body.email || undefined;
+  } catch {
+    // No body is fine
+  }
 
   try {
     const session = await stripe.checkout.sessions.create({
       mode: "subscription",
       payment_method_types: ["card"],
+      customer_email: email,
       line_items: [
         {
           price_data: {
@@ -34,7 +42,7 @@ export async function POST(request: NextRequest) {
           quantity: 1,
         },
       ],
-      success_url: `${origin}/app?upgraded=true`,
+      success_url: `${origin}/app?session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: `${origin}/upgrade`,
     });
 

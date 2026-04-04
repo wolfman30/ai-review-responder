@@ -1,19 +1,10 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { NextRequest, NextResponse } from "next/server";
+import { kv } from "@vercel/kv";
 
 const FREE_LIMIT = 5;
 
 export async function POST(request: NextRequest) {
-  const countHeader = request.headers.get("X-Response-Count");
-  const responseCount = countHeader ? parseInt(countHeader, 10) : 0;
-
-  if (responseCount >= FREE_LIMIT) {
-    return NextResponse.json(
-      { error: "Free limit reached. Please upgrade to Pro for unlimited responses." },
-      { status: 429 }
-    );
-  }
-
   const { review, businessName, businessType, tone } = await request.json();
 
   if (!review || !businessName || !businessType || !tone) {
@@ -21,6 +12,33 @@ export async function POST(request: NextRequest) {
       { error: "Missing required fields: review, businessName, businessType, tone" },
       { status: 400 }
     );
+  }
+
+  // Check Pro status via email header
+  const userEmail = request.headers.get("X-User-Email");
+  let isPro = false;
+
+  if (userEmail) {
+    try {
+      const proRecord = await kv.get(`pro:${userEmail.toLowerCase()}`);
+      isPro = !!proRecord;
+    } catch (err) {
+      // KV error — fail open (don't block user)
+      console.error("KV lookup error:", err);
+    }
+  }
+
+  // Enforce free limit for non-Pro users
+  if (!isPro) {
+    const countHeader = request.headers.get("X-Response-Count");
+    const responseCount = countHeader ? parseInt(countHeader, 10) : 0;
+
+    if (responseCount >= FREE_LIMIT) {
+      return NextResponse.json(
+        { error: "Free limit reached. Please upgrade to Pro for unlimited responses." },
+        { status: 429 }
+      );
+    }
   }
 
   const apiKey = process.env.ANTHROPIC_API_KEY;

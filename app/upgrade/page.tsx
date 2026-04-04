@@ -4,16 +4,24 @@ import { useState } from "react";
 import Link from "next/link";
 
 export default function UpgradePage() {
+  const [email, setEmail] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
   async function handleUpgrade() {
+    if (!email.trim() || !email.includes("@")) {
+      setError("Please enter a valid email address.");
+      return;
+    }
+
     setLoading(true);
     setError("");
 
     try {
       const res = await fetch("/api/create-checkout-session", {
         method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: email.trim().toLowerCase() }),
       });
 
       if (!res.ok) {
@@ -67,13 +75,25 @@ export default function UpgradePage() {
           </li>
         </ul>
 
-        <button
-          onClick={handleUpgrade}
-          disabled={loading}
-          className="mt-8 w-full max-w-sm rounded-lg bg-green-cta py-4 text-lg font-semibold text-white hover:bg-green-cta-hover transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-        >
-          {loading ? "Redirecting to checkout..." : "Subscribe to Pro — $19/mo"}
-        </button>
+        <div className="mt-8 max-w-sm mx-auto">
+          <label className="block text-sm font-medium text-gray-700 text-left mb-1">
+            Your email address
+          </label>
+          <input
+            type="email"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            placeholder="you@example.com"
+            className="w-full rounded-lg border border-gray-300 px-4 py-3 text-sm mb-4 focus:outline-none focus:ring-2 focus:ring-green-cta focus:border-transparent"
+          />
+          <button
+            onClick={handleUpgrade}
+            disabled={loading}
+            className="w-full rounded-lg bg-green-cta py-4 text-lg font-semibold text-white hover:bg-green-cta-hover transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {loading ? "Redirecting to checkout..." : "Subscribe to Pro — $19/mo"}
+          </button>
+        </div>
 
         {error && (
           <p className="mt-4 text-sm text-red-600">{error}</p>

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 
 interface BusinessInfo {
@@ -47,7 +48,10 @@ function setResponseCount(count: number) {
   );
 }
 
-export default function AppPage() {
+function AppContent() {
+  const router = useRouter();
+  const searchParams = useSearchParams();
+
   const [business, setBusiness] = useState<BusinessInfo>({
     name: "",
     type: "Restaurant",
@@ -60,15 +64,48 @@ export default function AppPage() {
   const [copied, setCopied] = useState(false);
   const [count, setCount] = useState(0);
   const [mounted, setMounted] = useState(false);
+  const [email, setEmail] = useState("");
+  const [isPro, setIsPro] = useState(false);
+  const [verifying, setVerifying] = useState(false);
 
   useEffect(() => {
     setMounted(true);
+
+    // Load saved business info
     const saved = localStorage.getItem("businessInfo");
-    if (saved) {
-      setBusiness(JSON.parse(saved));
-    }
+    if (saved) setBusiness(JSON.parse(saved));
+
+    // Load response count
     setCount(getResponseCount());
-  }, []);
+
+    // Load stored Pro status
+    const storedEmail = localStorage.getItem("proEmail");
+    if (storedEmail) {
+      setEmail(storedEmail);
+      setIsPro(true);
+    }
+
+    // Check for post-checkout session_id param
+    const sessionId = searchParams.get("session_id");
+    if (sessionId) {
+      setVerifying(true);
+      fetch(`/api/verify-session?session_id=${sessionId}`)
+        .then((res) => res.json())
+        .then((data) => {
+          if (data.isPro && data.email) {
+            localStorage.setItem("proEmail", data.email);
+            setEmail(data.email);
+            setIsPro(true);
+          }
+        })
+        .catch((err) => console.error("verify-session error:", err))
+        .finally(() => {
+          setVerifying(false);
+          // Clean up URL
+          router.replace("/app");
+        });
+    }
+  }, [router, searchParams]);
 
   useEffect(() => {
     if (mounted && business.name) {
@@ -76,7 +113,7 @@ export default function AppPage() {
     }
   }, [business, mounted]);
 
-  const limitReached = count >= FREE_LIMIT;
+  const limitReached = !isPro && count >= FREE_LIMIT;
 
   async function handleGenerate() {
     if (!business.name.trim() || !review.trim()) {
@@ -90,12 +127,15 @@ export default function AppPage() {
     setResponse("");
 
     try {
+      const headers: Record<string, string> = {
+        "Content-Type": "application/json",
+        "X-Response-Count": String(count),
+      };
+      if (email) headers["X-User-Email"] = email;
+
       const res = await fetch("/api/generate-response", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "X-Response-Count": String(count),
-        },
+        headers,
         body: JSON.stringify({
           review,
           businessName: business.name,
@@ -111,9 +151,12 @@ export default function AppPage() {
 
       const data = await res.json();
       setResponse(data.response);
-      const newCount = count + 1;
-      setCount(newCount);
-      setResponseCount(newCount);
+
+      if (!isPro) {
+        const newCount = count + 1;
+        setCount(newCount);
+        setResponseCount(newCount);
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Something went wrong");
     } finally {
@@ -137,9 +180,22 @@ export default function AppPage() {
 
   return (
     <div className="mx-auto max-w-3xl px-6 py-12">
-      <h1 className="text-3xl font-bold text-navy mb-8">
-        Generate a Review Response
-      </h1>
+      <div className="flex items-center justify-between mb-8">
+        <h1 className="text-3xl font-bold text-navy">
+          Generate a Review Response
+        </h1>
+        {isPro && (
+          <span className="rounded-full bg-green-cta px-3 py-1 text-xs font-bold text-white">
+            PRO ✓
+          </span>
+        )}
+      </div>
+
+      {verifying && (
+        <div className="rounded-lg bg-blue-50 border border-blue-200 text-blue-700 px-4 py-3 mb-6 text-sm">
+          Verifying your subscription…
+        </div>
+      )}
 
       {/* Business Info */}
       <div className="rounded-xl border border-gray-200 p-6 mb-8">
@@ -214,20 +270,22 @@ export default function AppPage() {
         />
       </div>
 
-      {/* Usage Counter */}
-      <div className="flex items-center justify-between mb-6">
-        <p className="text-sm text-gray-500">
-          {count} of {FREE_LIMIT} free responses used this month
-        </p>
-        {limitReached && (
-          <Link
-            href="/upgrade"
-            className="text-sm font-semibold text-green-cta hover:underline"
-          >
-            Upgrade for unlimited
-          </Link>
-        )}
-      </div>
+      {/* Usage Counter — hidden for Pro */}
+      {!isPro && (
+        <div className="flex items-center justify-between mb-6">
+          <p className="text-sm text-gray-500">
+            {count} of {FREE_LIMIT} free responses used this month
+          </p>
+          {limitReached && (
+            <Link
+              href="/upgrade"
+              className="text-sm font-semibold text-green-cta hover:underline"
+            >
+              Upgrade for unlimited
+            </Link>
+          )}
+        </div>
+      )}
 
       {/* Generate Button */}
       {limitReached ? (
@@ -289,5 +347,15 @@ export default function AppPage() {
         </div>
       )}
     </div>
+  );
+}
+
+import { Suspense } from "react";
+
+export default function AppPage() {
+  return (
+    <Suspense fallback={<div className="mx-auto max-w-3xl px-6 py-12 animate-pulse" />}>
+      <AppContent />
+    </Suspense>
   );
 }
