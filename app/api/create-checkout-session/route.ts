@@ -11,7 +11,7 @@ export async function POST(request: NextRequest) {
   }
 
   const stripe = new Stripe(secretKey);
-  const origin = request.headers.get("origin") || "http://localhost:3000";
+  const origin = process.env.NEXT_PUBLIC_APP_URL || request.headers.get("origin") || "http://localhost:3000";
 
   let email: string | undefined;
   try {
