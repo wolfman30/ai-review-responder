@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
 import Stripe from "stripe";
-import { kv } from "@vercel/kv";
 
 export async function GET(request: NextRequest) {
   const secretKey = process.env.STRIPE_SECRET_KEY;
@@ -32,13 +31,6 @@ export async function GET(request: NextRequest) {
     if (!email) {
       return NextResponse.json({ isPro: false }, { status: 400 });
     }
-
-    // Store Pro status (idempotent — webhook may have already done this)
-    await kv.set(`pro:${email.toLowerCase()}`, {
-      customerId: session.customer,
-      subscriptionId: session.subscription,
-      activatedAt: Date.now(),
-    });
 
     return NextResponse.json({ isPro: true, email });
   } catch (err) {

@@ -1,6 +1,6 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { NextRequest, NextResponse } from "next/server";
-import { kv } from "@vercel/kv";
+import { isProUser } from "../../lib/pro-check";
 
 const FREE_LIMIT = 5;
 
@@ -14,18 +14,12 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  // Check Pro status via email header
+  // Check Pro status via email header → live Stripe lookup
   const userEmail = request.headers.get("X-User-Email");
   let isPro = false;
 
   if (userEmail) {
-    try {
-      const proRecord = await kv.get(`pro:${userEmail.toLowerCase()}`);
-      isPro = !!proRecord;
-    } catch (err) {
-      // KV error — fail open (don't block user)
-      console.error("KV lookup error:", err);
-    }
+    isPro = await isProUser(userEmail);
   }
 
   // Enforce free limit for non-Pro users
