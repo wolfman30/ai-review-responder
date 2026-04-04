@@ -9,9 +9,43 @@ const geistSans = Geist({
 });
 
 export const metadata: Metadata = {
-  title: "ReviewAI — Automated Google Review Management",
+  metadataBase: new URL("https://reviews.aiwolfsolutions.com"),
+  title: {
+    default: "ReviewAI — AI-Powered Google Review Response Management",
+    template: "%s | ReviewAI",
+  },
   description:
-    "Monitor your Google Business reviews, get AI-drafted responses, and publish with one click. Free for 5 responses/month.",
+    "Never miss a Google review again. ReviewAI auto-drafts professional responses to every Google review in seconds. Connect your Google Business Profile, approve with one click, and publish. Free to start.",
+  keywords: [
+    "google review management",
+    "ai review response",
+    "google business profile",
+    "review automation",
+    "restaurant review management",
+  ],
+  openGraph: {
+    title: "ReviewAI — AI-Powered Google Review Response Management",
+    description:
+      "Never miss a Google review again. ReviewAI auto-drafts professional responses to every Google review in seconds. Connect your Google Business Profile, approve with one click, and publish. Free to start.",
+    url: "https://reviews.aiwolfsolutions.com",
+    siteName: "ReviewAI",
+    type: "website",
+    images: [
+      {
+        url: "/og-image.png",
+        width: 1200,
+        height: 630,
+        alt: "ReviewAI — AI-Powered Google Review Management",
+      },
+    ],
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "ReviewAI — AI-Powered Google Review Response Management",
+    description:
+      "Never miss a Google review again. ReviewAI auto-drafts professional responses to every Google review in seconds.",
+    images: ["/og-image.png"],
+  },
 };
 
 export default function RootLayout({
