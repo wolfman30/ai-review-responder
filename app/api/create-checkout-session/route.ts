@@ -1,6 +1,24 @@
 import { NextRequest, NextResponse } from "next/server";
 import Stripe from "stripe";
 
+const TIER_CONFIG: Record<
+  string,
+  { name: string; description: string; amount: number }
+> = {
+  pro: {
+    name: "ReviewAI Pro",
+    description:
+      "Unlimited AI responses, Google Business integration, 1 location monitored, email alerts",
+    amount: 4900,
+  },
+  business: {
+    name: "ReviewAI Business",
+    description:
+      "Everything in Pro + up to 5 locations, team access, priority support",
+    amount: 9900,
+  },
+};
+
 export async function POST(request: NextRequest) {
   const secretKey = process.env.STRIPE_SECRET_KEY;
   if (!secretKey) {
@@ -11,14 +29,25 @@ export async function POST(request: NextRequest) {
   }
 
   const stripe = new Stripe(secretKey);
-  const origin = process.env.NEXT_PUBLIC_APP_URL || request.headers.get("origin") || "http://localhost:3000";
+  const origin =
+    process.env.NEXT_PUBLIC_APP_URL ||
+    request.headers.get("origin") ||
+    "http://localhost:3000";
 
   let email: string | undefined;
+  let tier: string = "pro";
+
   try {
     const body = await request.json();
     email = body.email || undefined;
+    tier = body.tier || "pro";
   } catch {
-    // No body is fine
+    // No body is fine, default to pro
+  }
+
+  const config = TIER_CONFIG[tier];
+  if (!config) {
+    return NextResponse.json({ error: "Invalid tier" }, { status: 400 });
   }
 
   try {
@@ -26,15 +55,16 @@ export async function POST(request: NextRequest) {
       mode: "subscription",
       payment_method_types: ["card"],
       customer_email: email,
+      metadata: { tier },
       line_items: [
         {
           price_data: {
             currency: "usd",
             product_data: {
-              name: "AI Review Responder Pro",
-              description: "Unlimited AI-powered review responses",
+              name: config.name,
+              description: config.description,
             },
-            unit_amount: 1900,
+            unit_amount: config.amount,
             recurring: {
               interval: "month",
             },
@@ -42,7 +72,7 @@ export async function POST(request: NextRequest) {
           quantity: 1,
         },
       ],
-      success_url: `${origin}/app?session_id={CHECKOUT_SESSION_ID}`,
+      success_url: `${origin}/app/dashboard?session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: `${origin}/upgrade`,
     });
 

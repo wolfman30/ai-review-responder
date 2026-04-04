@@ -54,7 +54,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className={}>
+    <html lang="en" className={geistSans.variable}>
       <body className="min-h-full flex flex-col font-sans">
         <header className="bg-navy text-white">
           <nav className="mx-auto flex max-w-5xl items-center justify-between px-6 py-4">

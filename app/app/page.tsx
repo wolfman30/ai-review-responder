@@ -294,7 +294,7 @@ function AppContent() {
             You&apos;ve used all 5 free responses this month
           </p>
           <p className="text-gray-600 mb-4">
-            Upgrade to Pro for unlimited responses at $19/month.
+            Upgrade to Pro for unlimited responses, Google Business integration, and more.
           </p>
           <Link
             href="/upgrade"

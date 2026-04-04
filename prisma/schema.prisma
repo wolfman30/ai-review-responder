@@ -1,0 +1,68 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../app/generated/prisma"
+}
+
+datasource db {
+  provider = "sqlite"
+}
+
+model User {
+  id                String     @id @default(cuid())
+  email             String     @unique
+  stripeCustomerId  String?
+  tier              String     @default("free") // free, pro, business
+  googleAccessToken String?
+  googleRefreshToken String?
+  googleTokenExpiry DateTime?
+  alertsEnabled     Boolean    @default(true)
+  createdAt         DateTime   @default(now())
+  updatedAt         DateTime   @updatedAt
+  locations         Location[]
+}
+
+model Location {
+  id            String   @id @default(cuid())
+  userId        String
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  googleAccountId String
+  googleLocationId String
+  name          String
+  address       String?
+  phone         String?
+  avgRating     Float?
+  totalReviews  Int      @default(0)
+  isMonitored   Boolean  @default(true)
+  lastSyncedAt  DateTime?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  reviews       Review[]
+
+  @@unique([googleAccountId, googleLocationId])
+}
+
+model Review {
+  id              String    @id @default(cuid())
+  locationId      String
+  location        Location  @relation(fields: [locationId], references: [id], onDelete: Cascade)
+  googleReviewId  String    @unique
+  authorName      String
+  authorPhotoUrl  String?
+  rating          Int       // 1-5
+  text            String?
+  reviewDate      DateTime
+  aiDraft         String?
+  finalResponse   String?
+  respondedAt     DateTime?
+  status          String    @default("pending") // pending, drafted, approved, published, skipped
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+}
+
+model AuditLead {
+  id           String   @id @default(cuid())
+  email        String
+  businessName String
+  businessUrl  String?
+  createdAt    DateTime @default(now())
+}
