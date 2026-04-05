@@ -148,7 +148,13 @@ export async function POST(request: NextRequest) {
     }
   } catch (err) {
     console.error("Webhook handler error:", err);
-    // Return 200 anyway so Stripe doesn't retry — we logged the error
+    // Return 500 so Stripe retries — the event was valid but our
+    // handler failed (e.g. DB down). Stripe retries with exponential
+    // backoff for up to 72 hours, which is what we want.
+    return NextResponse.json(
+      { error: "Webhook handler failed" },
+      { status: 500 }
+    );
   }
 
   return NextResponse.json({ received: true });
