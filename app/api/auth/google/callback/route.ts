@@ -2,6 +2,9 @@ import { NextRequest, NextResponse } from "next/server";
 import { getOAuth2Client } from "@/app/lib/google";
 import { findOrCreateUser, setSessionCookie } from "@/app/lib/auth";
 import { prisma } from "@/app/lib/db";
+import { cookies } from "next/headers";
+
+const OAUTH_STATE_COOKIE = "reviewai_oauth_state";
 
 export async function GET(request: NextRequest) {
   const code = request.nextUrl.searchParams.get("code");
@@ -23,6 +26,26 @@ export async function GET(request: NextRequest) {
     );
   }
 
+  // Verify CSRF nonce from cookie matches state parameter
+  const cookieStore = await cookies();
+  const storedNonce = cookieStore.get(OAUTH_STATE_COOKIE)?.value;
+  // Clear the cookie regardless of outcome
+  cookieStore.delete(OAUTH_STATE_COOKIE);
+
+  let state: { userId?: string; email?: string; nonce?: string } = {};
+  try {
+    state = JSON.parse(stateStr);
+  } catch {
+    // ignore parse errors
+  }
+
+  if (!storedNonce || !state.nonce || storedNonce !== state.nonce) {
+    console.error("OAuth CSRF check failed: nonce mismatch");
+    return NextResponse.redirect(
+      `${baseUrl}/app/dashboard?error=invalid_state`
+    );
+  }
+
   try {
     const client = getOAuth2Client();
     const { tokens } = await client.getToken(code);
@@ -37,14 +60,6 @@ export async function GET(request: NextRequest) {
     );
     const userInfo = await userInfoRes.json();
     const googleEmail = userInfo.email as string;
-
-    // Parse state to see if we have an existing user/email
-    let state: { userId?: string; email?: string } = {};
-    try {
-      state = JSON.parse(stateStr);
-    } catch {
-      // ignore parse errors
-    }
 
     const email = state.email || googleEmail;
 
