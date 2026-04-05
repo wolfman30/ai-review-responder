@@ -48,14 +48,20 @@ export async function POST(request: NextRequest) {
     isPro = !!dbUser && dbUser.tier !== "free";
   }
 
-  // Enforce free limit server-side for ALL non-Pro users (including anonymous)
+  // Enforce free limit server-side for ALL non-Pro users (including anonymous).
+  // Uses atomic increment-before-generate to prevent race conditions:
+  // 1. Upsert user + reset month if needed
+  // 2. Atomically increment count
+  // 3. If count > limit, decrement and reject
+  // 4. If AI generation fails, decrement to refund the slot
+  let rateLimitIdentifier: string | null = null;
+
   if (!isPro) {
     const now = new Date();
-
-    // Use email if available, otherwise use anonymous cookie ID
     const identifier = userEmail || (await getOrCreateAnonId());
+    rateLimitIdentifier = identifier;
 
-    // Upsert user so we always have a record to check/update
+    // Upsert user so we always have a record
     let user = await prisma.user.upsert({
       where: { email: identifier },
       create: { email: identifier, responseCount: 0, responseCountResetAt: now },
@@ -69,13 +75,25 @@ export async function POST(request: NextRequest) {
       resetAt.getMonth() !== now.getMonth();
 
     if (isNewMonth) {
-      user = await prisma.user.update({
+      await prisma.user.update({
         where: { email: identifier },
         data: { responseCount: 0, responseCountResetAt: now },
       });
     }
 
-    if (user.responseCount >= FREE_LIMIT) {
+    // Atomically increment and check — prevents concurrent requests
+    // from all passing the check before any increment
+    user = await prisma.user.update({
+      where: { email: identifier },
+      data: { responseCount: { increment: 1 } },
+    });
+
+    if (user.responseCount > FREE_LIMIT) {
+      // Over limit — decrement back and reject
+      await prisma.user.update({
+        where: { email: identifier },
+        data: { responseCount: { decrement: 1 } },
+      });
       return NextResponse.json(
         { error: "Free limit reached. Please upgrade to Pro for unlimited responses." },
         { status: 429 }
@@ -109,18 +127,18 @@ export async function POST(request: NextRequest) {
     const textBlock = message.content.find((block) => block.type === "text");
     const responseText = textBlock ? textBlock.text : "";
 
-    // Increment server-side counter for free users (including anonymous)
-    if (!isPro) {
-      const identifier = userEmail || (await getOrCreateAnonId());
-      await prisma.user.update({
-        where: { email: identifier },
-        data: { responseCount: { increment: 1 } },
-      });
-    }
-
     return NextResponse.json({ response: responseText });
   } catch (err) {
     console.error("Anthropic API error:", err);
+
+    // Refund the rate limit slot if AI generation failed
+    if (rateLimitIdentifier) {
+      await prisma.user.update({
+        where: { email: rateLimitIdentifier },
+        data: { responseCount: { decrement: 1 } },
+      }).catch((e: unknown) => console.error("Failed to refund rate limit slot:", e));
+    }
+
     return NextResponse.json(
       { error: "Failed to generate response. Please try again." },
       { status: 500 }
