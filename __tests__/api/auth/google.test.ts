@@ -15,30 +15,26 @@ describe("GET /api/auth/google", () => {
     expect(location).toContain("accounts.google.com");
   });
 
-  it("sets CSRF nonce cookie", async () => {
+  it("sets CSRF nonce cookie on redirect response", async () => {
     mockCookieStore.get.mockReturnValue(undefined);
     const req = new NextRequest("http://localhost:3000/api/auth/google");
-    await GET(req);
+    const res = await GET(req);
 
-    expect(mockCookieStore.set).toHaveBeenCalledWith(
-      "reviewai_oauth_state",
-      expect.any(String),
-      expect.objectContaining({
-        httpOnly: true,
-        maxAge: 600, // 10 minutes
-        path: "/",
-      })
-    );
+    // Cookie is set directly on the response, not via cookies() store
+    const setCookie = res.headers.get("set-cookie");
+    expect(setCookie).toContain("reviewai_oauth_state");
+    expect(setCookie).toContain("HttpOnly");
+    expect(setCookie).toContain("Max-Age=600");
   });
 
   it("includes email from query param in state", async () => {
     mockCookieStore.get.mockReturnValue(undefined);
     const req = new NextRequest("http://localhost:3000/api/auth/google?email=user@test.com");
-    await GET(req);
+    const res = await GET(req);
 
-    // The nonce was set — we know the state includes the email because
-    // the route JSON.stringifys { userId, email, nonce }
-    expect(mockCookieStore.set).toHaveBeenCalled();
+    // Nonce cookie is set on the redirect response
+    const setCookie = res.headers.get("set-cookie");
+    expect(setCookie).toContain("reviewai_oauth_state");
   });
 
   it("redirects to error on failure", async () => {
