@@ -40,16 +40,19 @@ export async function GET(request: NextRequest) {
   }
 
   if (!storedNonce || !state.nonce || storedNonce !== state.nonce) {
-    console.error("OAuth CSRF check failed: nonce mismatch");
+    console.error(`[oauth-callback] CSRF failed: storedNonce=${storedNonce ? "present" : "MISSING"}, stateNonce=${state.nonce ? "present" : "MISSING"}, match=${storedNonce === state.nonce}`);
     return NextResponse.redirect(
       `${baseUrl}/app/dashboard?error=invalid_state`
     );
   }
+  console.log("[oauth-callback] CSRF nonce verified OK");
 
   try {
+    console.log("[oauth-callback] Step 1: exchanging code for tokens");
     const client = getOAuth2Client();
     const { tokens } = await client.getToken(code);
     client.setCredentials(tokens);
+    console.log("[oauth-callback] Step 2: tokens received, fetching userinfo");
 
     // Get user's email from Google
     const userInfoRes = await fetch(
@@ -60,11 +63,13 @@ export async function GET(request: NextRequest) {
     );
     const userInfo = await userInfoRes.json();
     const googleEmail = userInfo.email as string;
+    console.log("[oauth-callback] Step 3: got email", googleEmail);
 
     const email = state.email || googleEmail;
 
     // Find or create user
     const user = await findOrCreateUser(email);
+    console.log("[oauth-callback] Step 4: user found/created", user.id);
 
     // Store Google tokens
     await prisma.user.update({
@@ -77,6 +82,7 @@ export async function GET(request: NextRequest) {
           : null,
       },
     });
+    console.log("[oauth-callback] Step 5: tokens stored, redirecting to dashboard");
 
     // Set session cookie on the redirect response directly.
     // Using cookies().set() inside a redirect doesn't reliably attach
@@ -91,8 +97,11 @@ export async function GET(request: NextRequest) {
       path: "/",
     });
     return response;
-  } catch (err) {
-    console.error("Google OAuth callback error:", err);
+  } catch (err: unknown) {
+    const errMsg = err instanceof Error ? err.message : String(err);
+    const errStack = err instanceof Error ? err.stack : "";
+    console.error(`[oauth-callback] FAILED: ${errMsg}`);
+    console.error(`[oauth-callback] Stack: ${errStack}`);
     return NextResponse.redirect(
       `${baseUrl}/app/dashboard?error=token_exchange_failed`
     );
