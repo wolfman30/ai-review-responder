@@ -47,35 +47,42 @@ async function syncLocationReviews(
     authorName: string;
   }> = [];
 
+  // Batch-fetch existing review IDs to avoid N+1 queries
+  const googleReviewIds = googleReviews.map(
+    (gr) => gr.reviewId || gr.name.split("/").pop() || ""
+  );
+  const existingReviews = await prisma.review.findMany({
+    where: { googleReviewId: { in: googleReviewIds } },
+    select: { googleReviewId: true },
+  });
+  const existingIds = new Set(existingReviews.map((r) => r.googleReviewId));
+
   for (const gr of googleReviews) {
     const reviewId = gr.reviewId || gr.name.split("/").pop() || "";
-    const existing = await prisma.review.findUnique({
-      where: { googleReviewId: reviewId },
+
+    if (existingIds.has(reviewId)) continue;
+
+    const review = await prisma.review.create({
+      data: {
+        locationId: location.id,
+        googleReviewId: reviewId,
+        authorName: gr.reviewer.displayName || "Anonymous",
+        authorPhotoUrl: gr.reviewer.profilePhotoUrl || null,
+        rating: parseStarRating(gr.starRating),
+        text: gr.comment || null,
+        reviewDate: new Date(gr.createTime),
+        status: gr.reviewReply ? "published" : "pending",
+        finalResponse: gr.reviewReply?.comment || null,
+        respondedAt: gr.reviewReply
+          ? new Date(gr.reviewReply.updateTime)
+          : null,
+      },
     });
 
-    if (!existing) {
-      const review = await prisma.review.create({
-        data: {
-          locationId: location.id,
-          googleReviewId: reviewId,
-          authorName: gr.reviewer.displayName || "Anonymous",
-          authorPhotoUrl: gr.reviewer.profilePhotoUrl || null,
-          rating: parseStarRating(gr.starRating),
-          text: gr.comment || null,
-          reviewDate: new Date(gr.createTime),
-          status: gr.reviewReply ? "published" : "pending",
-          finalResponse: gr.reviewReply?.comment || null,
-          respondedAt: gr.reviewReply
-            ? new Date(gr.reviewReply.updateTime)
-            : null,
-        },
-      });
-
-      if (!gr.reviewReply && gr.comment) {
-        newReviews.push(review);
-      }
-      newReviewCount++;
+    if (!gr.reviewReply && gr.comment) {
+      newReviews.push(review);
     }
+    newReviewCount++;
   }
 
   // Generate AI drafts for new unresponded reviews
