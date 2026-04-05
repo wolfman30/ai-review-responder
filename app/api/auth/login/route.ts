@@ -1,35 +1,11 @@
-import { NextRequest, NextResponse } from "next/server";
-import { findOrCreateUser, setSessionCookie } from "@/app/lib/auth";
+import { NextResponse } from "next/server";
 
 /**
- * Simple email-based login. Creates user if not exists, sets session cookie.
- * No password — this is MVP auth. Google OAuth is the primary flow.
+ * Email-only login is disabled — use Google OAuth at /api/auth/google.
  */
-export async function POST(request: NextRequest) {
-  try {
-    const { email } = await request.json();
-
-    if (!email || !email.includes("@")) {
-      return NextResponse.json(
-        { error: "Valid email required" },
-        { status: 400 }
-      );
-    }
-
-    const user = await findOrCreateUser(email);
-    await setSessionCookie(user.id);
-
-    return NextResponse.json({
-      id: user.id,
-      email: user.email,
-      tier: user.tier,
-      hasGoogle: !!user.googleRefreshToken,
-    });
-  } catch (err) {
-    console.error("Login error:", err);
-    return NextResponse.json(
-      { error: "Login failed" },
-      { status: 500 }
-    );
-  }
+export async function POST() {
+  return NextResponse.json(
+    { error: "Email login is disabled. Please sign in with Google." },
+    { status: 410 }
+  );
 }
