@@ -1,11 +1,16 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getCurrentUser } from "@/app/lib/auth";
-import { getAuthenticatedClient, fetchReviews, parseStarRating } from "@/app/lib/google";
 import { prisma } from "@/app/lib/db";
 
 /**
- * GET: Fetch reviews for a location. Syncs new ones to DB.
- * Query params: locationId (our DB id)
+ * GET: Fetch reviews from the database.
+ *
+ * This endpoint only reads from DB. To sync new reviews from Google,
+ * use POST /api/google/sync instead. This separation prevents the GET
+ * from creating review records without AI drafts (which the sync
+ * endpoint generates).
+ *
+ * Query params: locationId (optional — our DB id)
  */
 export async function GET(request: NextRequest) {
   try {
@@ -40,68 +45,12 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: "Location not found" }, { status: 404 });
     }
 
-    // If Google is connected, sync reviews from Google
-    if (user.googleRefreshToken) {
-      const client = await getAuthenticatedClient(user.id);
-      if (client && client.credentials.access_token) {
-        try {
-          const googleLocationName = `accounts/${location.googleAccountId}/locations/${location.googleLocationId}`;
-          const googleReviews = await fetchReviews(
-            client.credentials.access_token,
-            googleLocationName
-          );
-
-          // Sync to DB
-          for (const gr of googleReviews) {
-            const reviewId = gr.reviewId || gr.name.split("/").pop() || "";
-            await prisma.review.upsert({
-              where: { googleReviewId: reviewId },
-              update: {
-                text: gr.comment || null,
-                rating: parseStarRating(gr.starRating),
-              },
-              create: {
-                locationId: location.id,
-                googleReviewId: reviewId,
-                authorName: gr.reviewer.displayName || "Anonymous",
-                authorPhotoUrl: gr.reviewer.profilePhotoUrl || null,
-                rating: parseStarRating(gr.starRating),
-                text: gr.comment || null,
-                reviewDate: new Date(gr.createTime),
-                status: gr.reviewReply ? "published" : "pending",
-                finalResponse: gr.reviewReply?.comment || null,
-                respondedAt: gr.reviewReply
-                  ? new Date(gr.reviewReply.updateTime)
-                  : null,
-              },
-            });
-          }
-
-          // Update location stats
-          const stats = await prisma.review.aggregate({
-            where: { locationId: location.id },
-            _avg: { rating: true },
-            _count: true,
-          });
-
-          await prisma.location.update({
-            where: { id: location.id },
-            data: {
-              avgRating: stats._avg.rating || null,
-              totalReviews: stats._count,
-              lastSyncedAt: new Date(),
-            },
-          });
-        } catch (syncErr) {
-          console.error("Review sync error:", syncErr);
-          // Still return what we have in DB
-        }
-      }
-    }
-
-    // Return reviews from DB
+    // Return reviews from DB only — no Google sync here
     const reviews = await prisma.review.findMany({
       where: { locationId },
+      include: {
+        location: { select: { name: true, id: true } },
+      },
       orderBy: { reviewDate: "desc" },
     });
 
