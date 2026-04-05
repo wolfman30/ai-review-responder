@@ -41,11 +41,6 @@ const jsonLd = {
       description: "Everything in Pro, up to 5 locations monitored, team access (5 members), priority support, custom voice training",
     },
   ],
-  aggregateRating: {
-    "@type": "AggregateRating",
-    ratingValue: "4.9",
-    reviewCount: "47",
-  },
 };
 
 export default function LandingPage() {
