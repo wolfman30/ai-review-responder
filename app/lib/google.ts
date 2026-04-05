@@ -9,9 +9,10 @@ const SCOPES = [
 export function getOAuth2Client(): OAuth2Client {
   const clientId = process.env.GOOGLE_CLIENT_ID;
   const clientSecret = process.env.GOOGLE_CLIENT_SECRET;
+  const appUrl =
+    process.env.NEXT_PUBLIC_APP_URL || "https://reviews.aiwolfsolutions.com";
   const redirectUri =
-    process.env.GOOGLE_REDIRECT_URI ||
-    `${process.env.NEXT_PUBLIC_APP_URL}/api/auth/google/callback`;
+    process.env.GOOGLE_REDIRECT_URI || `${appUrl}/api/auth/google/callback`;
 
   if (!clientId || !clientSecret) {
     throw new Error("Missing GOOGLE_CLIENT_ID or GOOGLE_CLIENT_SECRET");
