@@ -2,8 +2,30 @@ import Anthropic from "@anthropic-ai/sdk";
 import { NextRequest, NextResponse } from "next/server";
 import { isProUser } from "../../lib/pro-check";
 import { prisma } from "../../lib/db";
+import { cookies } from "next/headers";
 
 const FREE_LIMIT = 5;
+const ANON_COOKIE = "reviewai_anon_id";
+
+/**
+ * Get or create an anonymous session ID for rate-limiting unauthenticated users.
+ * Stored in an httpOnly cookie so it persists across requests.
+ */
+async function getOrCreateAnonId(): Promise<string> {
+  const cookieStore = await cookies();
+  const existing = cookieStore.get(ANON_COOKIE)?.value;
+  if (existing) return existing;
+
+  const anonId = `anon_${crypto.randomUUID()}`;
+  cookieStore.set(ANON_COOKIE, anonId, {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === "production",
+    sameSite: "lax",
+    maxAge: 60 * 60 * 24 * 90, // 90 days
+    path: "/",
+  });
+  return anonId;
+}
 
 export async function POST(request: NextRequest) {
   const { review, businessName, businessType, tone } = await request.json();
@@ -22,14 +44,17 @@ export async function POST(request: NextRequest) {
     isPro = await isProUser(userEmail);
   }
 
-  // Enforce free limit server-side for non-Pro users with a known email
-  if (!isPro && userEmail) {
+  // Enforce free limit server-side for ALL non-Pro users (including anonymous)
+  if (!isPro) {
     const now = new Date();
+
+    // Use email if available, otherwise use anonymous cookie ID
+    const identifier = userEmail || (await getOrCreateAnonId());
 
     // Upsert user so we always have a record to check/update
     let user = await prisma.user.upsert({
-      where: { email: userEmail },
-      create: { email: userEmail, responseCount: 0, responseCountResetAt: now },
+      where: { email: identifier },
+      create: { email: identifier, responseCount: 0, responseCountResetAt: now },
       update: {},
     });
 
@@ -41,7 +66,7 @@ export async function POST(request: NextRequest) {
 
     if (isNewMonth) {
       user = await prisma.user.update({
-        where: { email: userEmail },
+        where: { email: identifier },
         data: { responseCount: 0, responseCountResetAt: now },
       });
     }
@@ -80,10 +105,11 @@ export async function POST(request: NextRequest) {
     const textBlock = message.content.find((block) => block.type === "text");
     const responseText = textBlock ? textBlock.text : "";
 
-    // Increment server-side counter for free users
-    if (!isPro && userEmail) {
+    // Increment server-side counter for free users (including anonymous)
+    if (!isPro) {
+      const identifier = userEmail || (await getOrCreateAnonId());
       await prisma.user.update({
-        where: { email: userEmail },
+        where: { email: identifier },
         data: { responseCount: { increment: 1 } },
       });
     }
