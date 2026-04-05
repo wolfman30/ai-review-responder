@@ -33,12 +33,9 @@ describe("GET /api/auth/google/callback", () => {
     expect(res.status).toBe(307);
     const location = res.headers.get("location");
     expect(location).toContain("/app/dashboard?connected=true");
-    // Session cookie should be set
-    expect(mockCookieStore.set).toHaveBeenCalledWith(
-      "reviewai_session",
-      expect.any(String),
-      expect.any(Object)
-    );
+    // Session cookie is set directly on the redirect response
+    const setCookie = res.headers.get("set-cookie");
+    expect(setCookie).toContain("reviewai_session");
   });
 
   it("rejects when nonce cookie is missing", async () => {
