@@ -8,17 +8,19 @@ datasource db {
 }
 
 model User {
-  id                String     @id @default(cuid())
-  email             String     @unique
-  stripeCustomerId  String?
-  tier              String     @default("free") // free, pro, business
-  googleAccessToken String?
-  googleRefreshToken String?
-  googleTokenExpiry DateTime?
-  alertsEnabled     Boolean    @default(true)
-  createdAt         DateTime   @default(now())
-  updatedAt         DateTime   @updatedAt
-  locations         Location[]
+  id                   String     @id @default(cuid())
+  email                String     @unique
+  stripeCustomerId     String?
+  tier                 String     @default("free") // free, pro, business
+  googleAccessToken    String?
+  googleRefreshToken   String?
+  googleTokenExpiry    DateTime?
+  alertsEnabled        Boolean    @default(true)
+  responseCount        Int        @default(0)
+  responseCountResetAt DateTime   @default(now())
+  createdAt            DateTime   @default(now())
+  updatedAt            DateTime   @updatedAt
+  locations            Location[]
 }
 
 model Location {

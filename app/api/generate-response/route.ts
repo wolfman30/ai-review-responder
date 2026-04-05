@@ -1,6 +1,7 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { NextRequest, NextResponse } from "next/server";
 import { isProUser } from "../../lib/pro-check";
+import { prisma } from "../../lib/db";
 
 const FREE_LIMIT = 5;
 
@@ -14,7 +15,6 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  // Check Pro status via email header → live Stripe lookup
   const userEmail = request.headers.get("X-User-Email");
   let isPro = false;
 
@@ -22,12 +22,31 @@ export async function POST(request: NextRequest) {
     isPro = await isProUser(userEmail);
   }
 
-  // Enforce free limit for non-Pro users
-  if (!isPro) {
-    const countHeader = request.headers.get("X-Response-Count");
-    const responseCount = countHeader ? parseInt(countHeader, 10) : 0;
+  // Enforce free limit server-side for non-Pro users with a known email
+  if (!isPro && userEmail) {
+    const now = new Date();
 
-    if (responseCount >= FREE_LIMIT) {
+    // Upsert user so we always have a record to check/update
+    let user = await prisma.user.upsert({
+      where: { email: userEmail },
+      create: { email: userEmail, responseCount: 0, responseCountResetAt: now },
+      update: {},
+    });
+
+    // Reset count if we've rolled into a new calendar month
+    const resetAt = new Date(user.responseCountResetAt);
+    const isNewMonth =
+      resetAt.getFullYear() !== now.getFullYear() ||
+      resetAt.getMonth() !== now.getMonth();
+
+    if (isNewMonth) {
+      user = await prisma.user.update({
+        where: { email: userEmail },
+        data: { responseCount: 0, responseCountResetAt: now },
+      });
+    }
+
+    if (user.responseCount >= FREE_LIMIT) {
       return NextResponse.json(
         { error: "Free limit reached. Please upgrade to Pro for unlimited responses." },
         { status: 429 }
@@ -60,6 +79,14 @@ export async function POST(request: NextRequest) {
 
     const textBlock = message.content.find((block) => block.type === "text");
     const responseText = textBlock ? textBlock.text : "";
+
+    // Increment server-side counter for free users
+    if (!isPro && userEmail) {
+      await prisma.user.update({
+        where: { email: userEmail },
+        data: { responseCount: { increment: 1 } },
+      });
+    }
 
     return NextResponse.json({ response: responseText });
   } catch (err) {
