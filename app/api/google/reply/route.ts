@@ -47,20 +47,30 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Review not found" }, { status: 404 });
     }
 
-    // Publish to Google
-    if (user.googleRefreshToken) {
-      const client = await getAuthenticatedClient(user.id);
-      if (client && client.credentials.access_token) {
-        const googleReviewName = `accounts/${review.location.googleAccountId}/locations/${review.location.googleLocationId}/reviews/${review.googleReviewId}`;
-        await replyToReview(
-          client.credentials.access_token,
-          googleReviewName,
-          response
-        );
-      }
+    // Publish to Google — must succeed before we mark as published
+    if (!user.googleRefreshToken) {
+      return NextResponse.json(
+        { error: "Google account not connected. Please reconnect your Google Business Profile." },
+        { status: 400 }
+      );
     }
 
-    // Update DB
+    const client = await getAuthenticatedClient(user.id);
+    if (!client || !client.credentials.access_token) {
+      return NextResponse.json(
+        { error: "Failed to get Google credentials. Please reconnect your Google Business Profile." },
+        { status: 400 }
+      );
+    }
+
+    const googleReviewName = `accounts/${review.location.googleAccountId}/locations/${review.location.googleLocationId}/reviews/${review.googleReviewId}`;
+    await replyToReview(
+      client.credentials.access_token,
+      googleReviewName,
+      response
+    );
+
+    // Only update DB after successful Google publish
     await prisma.review.update({
       where: { id: reviewId },
       data: {

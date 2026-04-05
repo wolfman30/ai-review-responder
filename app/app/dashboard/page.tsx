@@ -133,6 +133,7 @@ function DashboardContent() {
       }
     } catch (err) {
       console.error("Publish error:", err);
+      alert("Failed to publish response. Please try again.");
     }
     setPublishingId(null);
   }
