@@ -76,14 +76,14 @@ export default function LandingPage() {
             Start Free — Connect Google
           </Link>
           <Link
-            href="/app"
+            href="/app/dashboard?demo=true"
             className="rounded-lg border-2 border-navy px-8 py-4 text-lg font-semibold text-navy hover:bg-navy hover:text-white transition-colors"
           >
-            Try Quick Response
+            See it in action →
           </Link>
         </div>
         <p className="mt-4 text-sm text-gray-400">
-          No credit card required. 5 free responses per month.
+          No credit card required &bull; Try the live demo instantly
         </p>
       </section>
 

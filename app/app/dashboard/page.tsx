@@ -4,6 +4,11 @@ import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { Suspense } from "react";
+import {
+  DEMO_USER,
+  DEMO_LOCATIONS,
+  DEMO_REVIEWS,
+} from "@/app/lib/demo-data";
 
 interface UserSession {
   id: string;
@@ -38,6 +43,8 @@ interface Review {
 
 function DashboardContent() {
   const searchParams = useSearchParams();
+  const isDemo = searchParams.get("demo") === "true";
+
   const [user, setUser] = useState<UserSession | null>(null);
   const [locations, setLocations] = useState<Location[]>([]);
   const [reviews, setReviews] = useState<Review[]>([]);
@@ -95,6 +102,13 @@ function DashboardContent() {
   useEffect(() => {
     async function init() {
       setLoading(true);
+      if (isDemo) {
+        setUser(DEMO_USER);
+        setLocations(DEMO_LOCATIONS);
+        setReviews(DEMO_REVIEWS as Review[]);
+        setLoading(false);
+        return;
+      }
       const hasSession = await fetchSession();
       if (hasSession) {
         await Promise.all([fetchLocations(), fetchReviews()]);
@@ -102,7 +116,7 @@ function DashboardContent() {
       setLoading(false);
     }
     init();
-  }, [fetchSession, fetchLocations, fetchReviews]);
+  }, [isDemo, fetchSession, fetchLocations, fetchReviews]);
 
   async function handleLogin(e: React.FormEvent) {
     e.preventDefault();
@@ -125,6 +139,7 @@ function DashboardContent() {
   }
 
   async function handleSync(locationId: string) {
+    if (isDemo) return; // no-op in demo mode
     setSyncing(true);
     try {
       await fetch("/api/google/sync", {
@@ -140,6 +155,17 @@ function DashboardContent() {
   }
 
   async function handlePublish(reviewId: string, response: string) {
+    if (isDemo) {
+      // Simulate publishing in demo mode — update local state only
+      setReviews((prev) =>
+        prev.map((r) =>
+          r.id === reviewId
+            ? { ...r, status: "published", finalResponse: response, aiDraft: null }
+            : r
+        )
+      );
+      return;
+    }
     setPublishingId(reviewId);
     try {
       const res = await fetch("/api/google/reply", {
@@ -171,7 +197,7 @@ function DashboardContent() {
     );
   }
 
-  // Login screen
+  // Login screen (only shown in non-demo mode)
   if (!user) {
     return (
       <div className="mx-auto max-w-md px-6 py-20">
@@ -206,6 +232,14 @@ function DashboardContent() {
         <p className="text-xs text-gray-400 text-center mt-4">
           No password needed. We&apos;ll create your account automatically.
         </p>
+        <p className="text-xs text-center mt-6">
+          <Link
+            href="/app/dashboard?demo=true"
+            className="text-green-cta underline"
+          >
+            Just want to explore? Try the demo →
+          </Link>
+        </p>
       </div>
     );
   }
@@ -229,30 +263,62 @@ function DashboardContent() {
 
   return (
     <div className="mx-auto max-w-5xl px-6 py-8">
-      {/* Welcome banner */}
-      <div className="mb-6 rounded-lg border border-green-200 bg-green-50 px-5 py-4 text-sm text-green-900">
-        <span className="font-semibold">Welcome to the ReviewAI beta!</span>{" "}
-        If anything doesn&apos;t work as expected, email me directly at{" "}
-        <a href="mailto:andrew@aiwolfsolutions.com" className="underline font-medium">
-          andrew@aiwolfsolutions.com
-        </a>{" "}
-        — I personally read every message.{" "}
-        <span className="text-green-700">&mdash; Andrew, Founder</span>
-      </div>
+      {/* Demo banner */}
+      {isDemo && (
+        <div className="mb-6 rounded-lg border border-blue-200 bg-blue-50 px-5 py-4 text-sm text-blue-900 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+          <div>
+            <span className="font-semibold">You&apos;re viewing a demo with sample data.</span>{" "}
+            Sign up to connect your own Google Business Profile and start
+            responding to real reviews.
+          </div>
+          <Link
+            href="/app/dashboard"
+            className="shrink-0 rounded-lg bg-green-cta px-4 py-2 font-semibold text-white text-sm hover:bg-green-cta-hover transition-colors"
+          >
+            Sign Up Free
+          </Link>
+        </div>
+      )}
+
+      {/* Welcome banner (non-demo only) */}
+      {!isDemo && (
+        <div className="mb-6 rounded-lg border border-green-200 bg-green-50 px-5 py-4 text-sm text-green-900">
+          <span className="font-semibold">Welcome to the ReviewAI beta!</span>{" "}
+          If anything doesn&apos;t work as expected, email me directly at{" "}
+          <a href="mailto:andrew@aiwolfsolutions.com" className="underline font-medium">
+            andrew@aiwolfsolutions.com
+          </a>{" "}
+          — I personally read every message.{" "}
+          <span className="text-green-700">&mdash; Andrew, Founder</span>
+        </div>
+      )}
 
       {/* Header */}
       <div className="flex items-center justify-between mb-8">
         <div>
           <h1 className="text-3xl font-bold text-navy">Dashboard</h1>
           <p className="text-sm text-gray-500 mt-1">
-            {user.email}{" "}
-            <span className="inline-block ml-2 rounded-full bg-navy text-white text-xs px-2 py-0.5 uppercase">
-              {user.tier}
-            </span>
+            {isDemo ? (
+              <span className="italic text-blue-600">Demo mode — sample data</span>
+            ) : (
+              <>
+                {user.email}{" "}
+                <span className="inline-block ml-2 rounded-full bg-navy text-white text-xs px-2 py-0.5 uppercase">
+                  {user.tier}
+                </span>
+              </>
+            )}
           </p>
         </div>
         <div className="flex gap-3">
-          {!user.hasGoogle ? (
+          {isDemo ? (
+            <Link
+              href="/app/dashboard"
+              className="rounded-lg bg-green-cta border-2 border-green-cta px-4 py-2 text-sm font-semibold text-white hover:bg-green-cta-hover transition-colors"
+            >
+              Connect Your Google Business
+            </Link>
+          ) : !user.hasGoogle ? (
             <a
               href={`/api/auth/google?email=${encodeURIComponent(user.email)}`}
               className="rounded-lg bg-white border-2 border-navy px-4 py-2 text-sm font-semibold text-navy hover:bg-navy hover:text-white transition-colors"
@@ -264,12 +330,14 @@ function DashboardContent() {
               Google Connected
             </span>
           )}
-          <Link
-            href="/app"
-            className="rounded-lg border border-gray-300 px-4 py-2 text-sm text-gray-600 hover:bg-gray-50 transition-colors"
-          >
-            Quick Response
-          </Link>
+          {!isDemo && (
+            <Link
+              href="/app"
+              className="rounded-lg border border-gray-300 px-4 py-2 text-sm text-gray-600 hover:bg-gray-50 transition-colors"
+            >
+              Quick Response
+            </Link>
+          )}
         </div>
       </div>
 
@@ -360,6 +428,7 @@ function DashboardContent() {
                 }
                 syncing={syncing}
                 onSync={() => handleSync(loc.id)}
+                isDemo={isDemo}
               />
             ))
           )}
@@ -394,6 +463,7 @@ function DashboardContent() {
                     handlePublish(review.id, response)
                   }
                   userTier={user.tier}
+                  isDemo={isDemo}
                 />
               ))
           )}
@@ -409,6 +479,7 @@ function DashboardContent() {
                   review={review}
                   publishing={false}
                   userTier={user.tier}
+                  isDemo={isDemo}
                 />
               ))}
             </>
@@ -416,8 +487,8 @@ function DashboardContent() {
         </div>
       )}
 
-      {/* Upgrade prompt for free users */}
-      {user.tier === "free" && locations.length === 0 && (
+      {/* Upgrade prompt for free users (non-demo) */}
+      {!isDemo && user.tier === "free" && locations.length === 0 && (
         <div className="mt-8 rounded-xl bg-gradient-to-r from-navy to-navy-light p-8 text-white text-center">
           <h3 className="text-xl font-bold mb-2">
             Automate your review responses
@@ -431,6 +502,25 @@ function DashboardContent() {
             className="inline-block rounded-lg bg-green-cta px-6 py-3 font-semibold text-white hover:bg-green-cta-hover transition-colors"
           >
             Upgrade to Pro — $49/mo
+          </Link>
+        </div>
+      )}
+
+      {/* Demo sign-up CTA at bottom */}
+      {isDemo && (
+        <div className="mt-10 rounded-xl bg-gradient-to-r from-navy to-navy-light p-8 text-white text-center">
+          <h3 className="text-xl font-bold mb-2">
+            Ready to do this for your own business?
+          </h3>
+          <p className="text-gray-300 mb-6 max-w-xl mx-auto">
+            Connect your Google Business Profile and start getting AI-drafted
+            responses for every review — in minutes, not months.
+          </p>
+          <Link
+            href="/app/dashboard"
+            className="inline-block rounded-lg bg-green-cta px-6 py-3 font-semibold text-white hover:bg-green-cta-hover transition-colors"
+          >
+            Start Free — No Credit Card Required
           </Link>
         </div>
       )}
@@ -453,12 +543,14 @@ function LocationCard({
   pendingCount,
   syncing,
   onSync,
+  isDemo,
 }: {
   location: Location;
   reviewCount: number;
   pendingCount: number;
   syncing: boolean;
   onSync: () => void;
+  isDemo: boolean;
 }) {
   return (
     <div className="rounded-xl border border-gray-200 p-6 flex items-center justify-between">
@@ -490,8 +582,9 @@ function LocationCard({
       </div>
       <button
         onClick={onSync}
-        disabled={syncing}
+        disabled={syncing || isDemo}
         className="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors disabled:opacity-50"
+        title={isDemo ? "Syncing is disabled in demo mode" : undefined}
       >
         {syncing ? "Syncing..." : "Sync Reviews"}
       </button>
@@ -523,6 +616,7 @@ function ReviewCard({
   onEditDraft,
   onPublish,
   userTier,
+  isDemo,
 }: {
   review: Review;
   publishing: boolean;
@@ -530,6 +624,7 @@ function ReviewCard({
   onEditDraft?: (text: string) => void;
   onPublish?: (response: string) => void;
   userTier: string;
+  isDemo: boolean;
 }) {
   const isPending = review.status === "pending" || review.status === "drafted";
   const draftText = editDraft ?? review.aiDraft ?? "";
@@ -592,18 +687,23 @@ function ReviewCard({
             rows={3}
             className="w-full text-sm text-gray-700 leading-relaxed border border-gray-200 rounded px-3 py-2 mb-3 focus:outline-none focus:ring-2 focus:ring-green-cta focus:border-transparent resize-y"
           />
-          <div className="flex gap-2">
+          <div className="flex items-center gap-3">
             <button
               onClick={() => onPublish(draftText)}
-              disabled={publishing || userTier === "free"}
+              disabled={publishing || (!isDemo && userTier === "free")}
               className="rounded-lg bg-green-cta px-4 py-2 text-sm font-medium text-white hover:bg-green-cta-hover transition-colors disabled:opacity-50"
             >
               {publishing
                 ? "Publishing..."
-                : userTier === "free"
+                : !isDemo && userTier === "free"
                 ? "Upgrade to Publish"
                 : "Approve & Publish"}
             </button>
+            {isDemo && (
+              <span className="text-xs text-gray-400">
+                Click to see how approving works
+              </span>
+            )}
           </div>
         </div>
       )}
