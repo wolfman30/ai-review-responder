@@ -1,6 +1,5 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { NextRequest, NextResponse } from "next/server";
-import { isProUser } from "../../lib/pro-check";
 import { prisma } from "../../lib/db";
 import { cookies } from "next/headers";
 
@@ -40,8 +39,13 @@ export async function POST(request: NextRequest) {
   const userEmail = request.headers.get("X-User-Email");
   let isPro = false;
 
+  // Check tier from DB (set by Stripe webhook) instead of hitting Stripe API
   if (userEmail) {
-    isPro = await isProUser(userEmail);
+    const dbUser = await prisma.user.findUnique({
+      where: { email: userEmail.toLowerCase().trim() },
+      select: { tier: true },
+    });
+    isPro = !!dbUser && dbUser.tier !== "free";
   }
 
   // Enforce free limit server-side for ALL non-Pro users (including anonymous)
