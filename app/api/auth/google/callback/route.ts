@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getOAuth2Client } from "@/app/lib/google";
-import { findOrCreateUser, setSessionCookie } from "@/app/lib/auth";
+import { findOrCreateUser } from "@/app/lib/auth";
 import { prisma } from "@/app/lib/db";
 import { cookies } from "next/headers";
 
@@ -78,13 +78,19 @@ export async function GET(request: NextRequest) {
       },
     });
 
-    // Set session cookie
-    await setSessionCookie(user.id);
-
-    // Redirect to dashboard
-    return NextResponse.redirect(
-      `${baseUrl}/app/dashboard?connected=true`
-    );
+    // Set session cookie on the redirect response directly.
+    // Using cookies().set() inside a redirect doesn't reliably attach
+    // the Set-Cookie header in Next.js — we must set it on the response.
+    const redirectUrl = `${baseUrl}/app/dashboard?connected=true`;
+    const response = NextResponse.redirect(redirectUrl);
+    response.cookies.set("reviewai_session", user.id, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "lax",
+      maxAge: 60 * 60 * 24 * 30, // 30 days
+      path: "/",
+    });
+    return response;
   } catch (err) {
     console.error("Google OAuth callback error:", err);
     return NextResponse.redirect(
