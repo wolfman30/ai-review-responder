@@ -69,12 +69,12 @@ export default function LandingPage() {
           every review. Approve and publish with one click.
         </p>
         <div className="mt-8 flex flex-col sm:flex-row items-center justify-center gap-4">
-          <Link
-            href="/app/dashboard"
+          <a
+            href="/api/auth/google"
             className="rounded-lg bg-green-cta px-8 py-4 text-lg font-semibold text-white shadow-md hover:bg-green-cta-hover transition-colors"
           >
             Start Free — Connect Google
-          </Link>
+          </a>
           <Link
             href="/app"
             className="rounded-lg border-2 border-navy px-8 py-4 text-lg font-semibold text-navy hover:bg-navy hover:text-white transition-colors"
@@ -233,12 +233,12 @@ export default function LandingPage() {
             Businesses that respond to reviews see 12% higher ratings on
             average. Start responding to every review in seconds.
           </p>
-          <Link
-            href="/app/dashboard"
+          <a
+            href="/api/auth/google"
             className="inline-block rounded-lg bg-green-cta px-8 py-4 text-lg font-semibold text-white shadow-md hover:bg-green-cta-hover transition-colors"
           >
             Get Started Free
-          </Link>
+          </a>
         </div>
       </section>
     </div>
