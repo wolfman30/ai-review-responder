@@ -68,3 +68,22 @@ model AuditLead {
   businessUrl  String?
   createdAt    DateTime @default(now())
 }
+
+model BetaApplication {
+  id           String   @id @default(cuid())
+  firstName    String
+  businessName String
+  email        String
+  businessType String
+  challenge    String?
+  createdAt    DateTime @default(now())
+}
+
+model FeedbackSubmission {
+  id            String   @id @default(cuid())
+  rating        Int
+  workingWell   String
+  couldBeBetter String
+  createdAt     DateTime @default(now())
+  userId        String?
+}
