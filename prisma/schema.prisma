@@ -77,6 +77,8 @@ model BetaApplication {
   businessType String
   challenge    String?
   createdAt    DateTime @default(now())
+
+  @@map("beta_applications")
 }
 
 model FeedbackSubmission {
@@ -86,4 +88,6 @@ model FeedbackSubmission {
   couldBeBetter String
   createdAt     DateTime @default(now())
   userId        String?
+
+  @@map("feedback_submissions")
 }

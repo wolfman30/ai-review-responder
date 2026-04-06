@@ -1,5 +1,5 @@
 -- CreateTable
-CREATE TABLE "BetaApplication" (
+CREATE TABLE "beta_applications" (
     "id" TEXT NOT NULL PRIMARY KEY,
     "firstName" TEXT NOT NULL,
     "businessName" TEXT NOT NULL,
@@ -10,7 +10,7 @@ CREATE TABLE "BetaApplication" (
 );
 
 -- CreateTable
-CREATE TABLE "FeedbackSubmission" (
+CREATE TABLE "feedback_submissions" (
     "id" TEXT NOT NULL PRIMARY KEY,
     "rating" INTEGER NOT NULL,
     "workingWell" TEXT NOT NULL,
