@@ -150,7 +150,11 @@ function AppContent() {
       }
 
       const data = await res.json();
-      setResponse(data.response);
+      const generatedText: string = data.response ?? "";
+      if (!generatedText.trim()) {
+        throw new Error("No response was generated. Please try again.");
+      }
+      setResponse(generatedText);
 
       if (!isPro) {
         const newCount = count + 1;

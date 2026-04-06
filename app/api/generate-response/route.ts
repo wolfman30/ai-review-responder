@@ -124,8 +124,11 @@ export async function POST(request: NextRequest) {
       ],
     });
 
-    const textBlock = message.content.find((block) => block.type === "text");
-    const responseText = textBlock ? textBlock.text : "";
+    const responseText = message.content
+      .filter((block): block is { type: "text"; text: string } => block.type === "text")
+      .map((block) => block.text)
+      .join("")
+      .trim();
 
     return NextResponse.json({ response: responseText });
   } catch (err) {
