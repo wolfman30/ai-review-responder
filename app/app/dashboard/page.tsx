@@ -48,6 +48,12 @@ function DashboardContent() {
   );
   const [publishingId, setPublishingId] = useState<string | null>(null);
   const [editingDraft, setEditingDraft] = useState<Record<string, string>>({});
+  const [feedbackOpen, setFeedbackOpen] = useState(false);
+  const [feedbackLoading, setFeedbackLoading] = useState(false);
+  const [feedbackDone, setFeedbackDone] = useState(false);
+  const [feedbackRating, setFeedbackRating] = useState(0);
+  const [workingWell, setWorkingWell] = useState("");
+  const [couldBeBetter, setCouldBeBetter] = useState("");
 
   const connected = searchParams.get("connected");
   const error = searchParams.get("error");
@@ -136,6 +142,27 @@ function DashboardContent() {
       alert("Failed to publish response. Please try again.");
     }
     setPublishingId(null);
+  }
+
+  async function handleFeedbackSubmit() {
+    setFeedbackLoading(true);
+    try {
+      const res = await fetch("/api/feedback", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ rating: feedbackRating, working: workingWell, improve: couldBeBetter }) });
+      if (!res.ok) {
+        const data = await res.json();
+        alert(data.error || "Failed to submit feedback");
+        return;
+      }
+      setFeedbackDone(true);
+      setFeedbackRating(0);
+      setWorkingWell("");
+      setCouldBeBetter("");
+    } catch (err) {
+      console.error("Feedback error:", err);
+      alert("Failed to submit feedback. Please try again.");
+    } finally {
+      setFeedbackLoading(false);
+    }
   }
 
   if (loading) {
@@ -412,6 +439,82 @@ function DashboardContent() {
           </Link>
         </div>
       )}
+
+      <button
+        onClick={() => { setFeedbackOpen(true); setFeedbackDone(false); }}
+        className="fixed bottom-6 right-6 z-40 rounded-full bg-navy px-5 py-3 text-sm font-semibold text-white shadow-lg transition-colors hover:bg-navy-light"
+      >
+        💬 Feedback
+      </button>
+
+      <div
+        className={`fixed inset-0 z-40 bg-slate-950/30 transition-opacity ${feedbackOpen ? "opacity-100" : "pointer-events-none opacity-0"}`}
+        onClick={() => setFeedbackOpen(false)}
+      />
+      <aside
+        className={`fixed right-0 top-0 z-50 flex h-full w-full max-w-md flex-col border-l border-gray-200 bg-white p-6 shadow-2xl transition-transform ${feedbackOpen ? "translate-x-0" : "translate-x-full"}`}
+      >
+        <div className="mb-6 flex items-center justify-between">
+          <h2 className="text-xl font-bold text-navy">Share Your Feedback</h2>
+          <button
+            onClick={() => setFeedbackOpen(false)}
+            className="rounded-md px-2 py-1 text-gray-500 hover:bg-gray-100"
+          >
+            ✕
+          </button>
+        </div>
+
+        {feedbackDone ? (
+          <div className="rounded-xl border border-green-200 bg-green-50 p-4 text-sm text-green-800">Thanks for the feedback. We read every submission.</div>
+        ) : (
+          <div className="space-y-5">
+            <div>
+              <p className="mb-2 text-sm font-medium text-gray-700">How would you rate your experience today?</p>
+              <div className="flex gap-1">
+                {[1, 2, 3, 4, 5].map((star) => (
+                  <button
+                    key={star}
+                    onClick={() => setFeedbackRating(star)}
+                    className={`text-3xl ${star <= feedbackRating ? "text-yellow-400" : "text-gray-300"}`}
+                    type="button"
+                  >
+                    &#9733;
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div>
+              <label className="mb-2 block text-sm font-medium text-gray-700">What&apos;s working well?</label>
+              <textarea
+                value={workingWell}
+                onChange={(e) => setWorkingWell(e.target.value)}
+                rows={5}
+                className="w-full rounded-xl border border-gray-300 px-4 py-3 text-sm outline-none focus:border-green-cta"
+              />
+            </div>
+            <div>
+              <label className="mb-2 block text-sm font-medium text-gray-700">What could be better?</label>
+              <textarea
+                value={couldBeBetter}
+                onChange={(e) => setCouldBeBetter(e.target.value)}
+                rows={5}
+                className="w-full rounded-xl border border-gray-300 px-4 py-3 text-sm outline-none focus:border-green-cta"
+              />
+            </div>
+            <button
+              onClick={handleFeedbackSubmit}
+              disabled={
+                feedbackLoading ||
+                feedbackRating === 0 ||
+                !workingWell.trim() ||
+                !couldBeBetter.trim()
+              }
+              className="w-full rounded-xl bg-green-cta px-5 py-3 font-semibold text-white transition-colors hover:bg-green-cta-hover disabled:opacity-60"
+              type="button"
+            >{feedbackLoading ? "Submitting..." : "Submit Feedback"}</button>
+          </div>
+        )}
+      </aside>
     </div>
   );
 }
