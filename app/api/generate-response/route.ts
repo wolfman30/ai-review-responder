@@ -130,6 +130,10 @@ export async function POST(request: NextRequest) {
       .join("")
       .trim();
 
+    if (!responseText) {
+      throw new Error("Anthropic returned an empty response");
+    }
+
     return NextResponse.json({ response: responseText });
   } catch (err) {
     console.error("Anthropic API error:", err);
