@@ -1,4 +1,5 @@
 import Anthropic from "@anthropic-ai/sdk";
+import type { TextBlock } from "@anthropic-ai/sdk/resources/messages/messages";
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "../../lib/db";
 import { cookies } from "next/headers";
@@ -125,7 +126,7 @@ export async function POST(request: NextRequest) {
     });
 
     const responseText = message.content
-      .filter((block): block is { type: "text"; text: string } => block.type === "text")
+      .filter((block): block is TextBlock => block.type === "text")
       .map((block) => block.text)
       .join("")
       .trim();
